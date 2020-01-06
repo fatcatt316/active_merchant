@@ -111,11 +111,6 @@ Layout/SpaceInsideArrayPercentLiteral:
 Layout/SpaceInsideHashLiteralBraces:
   Enabled: false
 
-# Offense count: 115
-# Cop supports --auto-correct.
-Layout/SpaceInsidePercentLiteralDelimiters:
-  Enabled: false
-
 # Offense count: 150
 # Configuration parameters: AllowSafeAssignment.
 Lint/AssignmentInCondition:
