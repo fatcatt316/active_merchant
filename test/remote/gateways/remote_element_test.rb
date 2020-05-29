@@ -50,6 +50,12 @@ class RemoteElementTest < Test::Unit::TestCase
     assert_equal 'Approved', response.message
   end
 
+  def test_successful_purchase_with_card_present_code
+    response = @gateway.purchase(@amount, @credit_card, @options.merge(card_present_code: 'Present'))
+    assert_success response
+    assert_equal 'Approved', response.message
+  end
+
   def test_successful_authorize_and_capture
     auth = @gateway.authorize(@amount, @credit_card, @options)
     assert_success auth
@@ -121,7 +127,7 @@ class RemoteElementTest < Test::Unit::TestCase
   def test_successful_verify
     response = @gateway.verify(@credit_card, @options)
     assert_success response
-    assert_match %r{Approved}, response.message
+    assert_equal 'Success', response.message
   end
 
   def test_successful_store

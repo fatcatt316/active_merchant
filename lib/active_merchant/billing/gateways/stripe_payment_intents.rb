@@ -112,8 +112,22 @@ module ActiveMerchant #:nodoc:
       end
 
       def refund(money, intent_id, options = {})
-        intent = commit(:get, "payment_intents/#{intent_id}", nil, options)
-        charge_id = intent.params.dig('charges', 'data')[0].dig('id')
+        if intent_id.include?('pi_')
+          intent = api_request(:get, "payment_intents/#{intent_id}", nil, options)
+
+          return Response.new(false, intent['error']['message'], intent) if intent['error']
+
+          charge_id = intent.try(:[], 'charges').try(:[], 'data').try(:[], 0).try(:[], 'id')
+
+          if charge_id.nil?
+            error_message = "No associated charge for #{intent['id']}"
+            error_message <<  "; payment_intent has a status of #{intent['status']}" if intent.try(:[], 'status') && intent.try(:[], 'status') != 'succeeded'
+            return Response.new(false, error_message, intent)
+          end
+        else
+          charge_id = intent_id
+        end
+
         super(money, charge_id, options)
       end
 
@@ -280,6 +294,16 @@ module ActiveMerchant #:nodoc:
         return options unless options[:idempotency_key]
 
         options.merge(idempotency_key: "#{options[:idempotency_key]}-#{suffix}")
+      end
+
+      def success_from(response, options)
+        if response['status'] == 'requires_action' && !options[:execute_threed]
+          response['error'] = {}
+          response['error']['message'] = 'Received unexpected 3DS authentication response. Use the execute_threed option to initiate a proper 3DS flow.'
+          return false
+        end
+
+        super(response, options)
       end
     end
   end

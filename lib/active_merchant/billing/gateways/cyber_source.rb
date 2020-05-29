@@ -27,6 +27,14 @@ module ActiveMerchant #:nodoc:
       # Schema files can be found here: https://ics2ws.ic3.com/commerce/1.x/transactionProcessor/
       TEST_XSD_VERSION = '1.164'
       PRODUCTION_XSD_VERSION = '1.164'
+      ECI_BRAND_MAPPING = {
+        visa: 'vbv',
+        master: 'spa',
+        american_express: 'aesk',
+        jcb: 'js',
+        discover: 'pb',
+      }.freeze
+      DEFAULT_COLLECTION_INDICATOR = 2
 
       self.supported_cardtypes = [:visa, :master, :american_express, :discover, :diners_club, :jcb, :dankort, :maestro, :elo]
       self.supported_countries = %w(US BR CA CN DK FI FR DE IN JP MX NO SE GB SG LB PK)
@@ -273,6 +281,7 @@ module ActiveMerchant #:nodoc:
         add_stored_credential_options(xml, options)
         add_issuer_additional_data(xml, options)
         add_merchant_description(xml, options)
+        add_partner_solution_id(xml)
 
         xml.target!
       end
@@ -300,6 +309,7 @@ module ActiveMerchant #:nodoc:
         add_business_rules_data(xml, authorization, options)
         add_issuer_additional_data(xml, options)
         add_merchant_description(xml, options)
+        add_partner_solution_id(xml)
 
         xml.target!
       end
@@ -317,9 +327,12 @@ module ActiveMerchant #:nodoc:
           add_threeds_services(xml, options)
           add_payment_network_token(xml) if network_tokenization?(payment_method_or_reference)
           add_business_rules_data(xml, payment_method_or_reference, options) unless options[:pinless_debit_card]
+          add_stored_credential_options(xml, options)
         end
+
         add_issuer_additional_data(xml, options)
         add_merchant_description(xml, options)
+        add_partner_solution_id(xml)
 
         xml.target!
       end
@@ -339,6 +352,8 @@ module ActiveMerchant #:nodoc:
           add_auth_reversal_service(xml, request_id, request_token)
         end
         add_issuer_additional_data(xml, options)
+        add_partner_solution_id(xml)
+
         xml.target!
       end
 
@@ -349,6 +364,7 @@ module ActiveMerchant #:nodoc:
         xml = Builder::XmlMarkup.new indent: 2
         add_purchase_data(xml, money, true, options)
         add_credit_service(xml, request_id, request_token)
+        add_partner_solution_id(xml)
 
         xml.target!
       end
@@ -464,6 +480,7 @@ module ActiveMerchant #:nodoc:
         xml.tag! 'clientLibrary', 'Ruby Active Merchant'
         xml.tag! 'clientLibraryVersion', VERSION
         xml.tag! 'clientEnvironment', RUBY_PLATFORM
+
         add_merchant_descriptor(xml, options)
       end
 
@@ -598,7 +615,7 @@ module ActiveMerchant #:nodoc:
         xml.tag!('cavvAlgorithm', threeds_2_options[:cavv_algorithm]) if threeds_2_options[:cavv_algorithm]
         xml.tag!('paSpecificationVersion', threeds_2_options[:version]) if threeds_2_options[:version]
         xml.tag!('directoryServerTransactionID', threeds_2_options[:ds_transaction_id]) if threeds_2_options[:ds_transaction_id]
-        xml.tag!('commerceIndicator', options[:commerce_indicator]) if options[:commerce_indicator]
+        xml.tag!('commerceIndicator', options[:commerce_indicator] || ECI_BRAND_MAPPING[card_brand(payment_method).to_sym])
         xml.tag!('eciRaw', threeds_2_options[:eci]) if threeds_2_options[:eci]
         xml.tag!('xid', threeds_2_options[:xid]) if threeds_2_options[:xid]
         xml.tag!('veresEnrolled', threeds_2_options[:enrolled]) if threeds_2_options[:enrolled]
@@ -610,12 +627,13 @@ module ActiveMerchant #:nodoc:
 
         xml.tag! 'ucaf' do
           xml.tag!('authenticationData', options[:three_d_secure][:cavv])
-          xml.tag!('collectionIndicator', options[:collection_indicator]) if options[:collection_indicator]
+          xml.tag!('collectionIndicator', options[:collection_indicator] || DEFAULT_COLLECTION_INDICATOR)
         end
       end
 
       def stored_credential_commerce_indicator(options)
         return unless options[:stored_credential]
+
         return if options[:stored_credential][:initial_transaction]
 
         case options[:stored_credential][:reason_type]
@@ -631,26 +649,28 @@ module ActiveMerchant #:nodoc:
       def add_auth_network_tokenization(xml, payment_method, options)
         return unless network_tokenization?(payment_method)
 
-        case card_brand(payment_method).to_sym
+        brand = card_brand(payment_method).to_sym
+
+        case brand
         when :visa
           xml.tag! 'ccAuthService', {'run' => 'true'} do
             xml.tag!('cavv', payment_method.payment_cryptogram)
-            xml.tag!('commerceIndicator', 'vbv')
+            xml.tag!('commerceIndicator', ECI_BRAND_MAPPING[brand])
             xml.tag!('xid', payment_method.payment_cryptogram)
           end
         when :master
           xml.tag! 'ucaf' do
             xml.tag!('authenticationData', payment_method.payment_cryptogram)
-            xml.tag!('collectionIndicator', '2')
+            xml.tag!('collectionIndicator', DEFAULT_COLLECTION_INDICATOR)
           end
           xml.tag! 'ccAuthService', {'run' => 'true'} do
-            xml.tag!('commerceIndicator', 'spa')
+            xml.tag!('commerceIndicator', ECI_BRAND_MAPPING[brand])
           end
         when :american_express
           cryptogram = Base64.decode64(payment_method.payment_cryptogram)
           xml.tag! 'ccAuthService', {'run' => 'true'} do
             xml.tag!('cavv', Base64.encode64(cryptogram[0...20]))
-            xml.tag!('commerceIndicator', 'aesk')
+            xml.tag!('commerceIndicator', ECI_BRAND_MAPPING[brand])
             xml.tag!('xid', Base64.encode64(cryptogram[20...40]))
           end
         end
@@ -800,15 +820,16 @@ module ActiveMerchant #:nodoc:
 
       def add_stored_credential_options(xml, options={})
         return unless options[:stored_credential]
+        xml.tag! 'subsequentAuth', 'true' if options[:stored_credential][:initiator] == 'merchant'
+        xml.tag! 'subsequentAuthFirst', 'true' if options[:stored_credential][:initial_transaction]
+        xml.tag! 'subsequentAuthTransactionID', options[:stored_credential][:network_transaction_id] if options[:stored_credential][:initiator] == 'merchant'
+        xml.tag! 'subsequentAuthStoredCredential', 'true' if options[:stored_credential][:initiator] == 'cardholder' && !options[:stored_credential][:initial_transaction] || options[:stored_credential][:initiator] == 'merchant' && options[:stored_credential][:reason_type] == 'unscheduled'
+      end
 
-        if options[:stored_credential][:initial_transaction]
-          xml.tag! 'subsequentAuthFirst', 'true'
-        elsif options[:stored_credential][:reason_type] == 'unscheduled'
-          xml.tag! 'subsequentAuth', 'true'
-          xml.tag! 'subsequentAuthTransactionID', options[:stored_credential][:network_transaction_id]
-        else
-          xml.tag! 'subsequentAuthTransactionID', options[:stored_credential][:network_transaction_id]
-        end
+      def add_partner_solution_id(xml)
+        return unless application_id
+
+        xml.tag!('partnerSolutionID', application_id)
       end
 
       # Where we actually build the full SOAP request using builder
@@ -852,7 +873,7 @@ module ActiveMerchant #:nodoc:
         end
 
         success = success?(response)
-        message = response[:message]
+        message = message_from(response)
 
         authorization = success ? authorization_from(response, action, amount, options) : nil
 
@@ -918,6 +939,16 @@ module ActiveMerchant #:nodoc:
 
       def success?(response)
         response[:decision] == @@decision_codes[:accept]
+      end
+
+      def message_from(response)
+        if response[:reasonCode] == '101' && response[:missingField]
+          "#{response[:message]}: #{response[:missingField]}"
+        elsif response[:reasonCode] == '102' && response[:invalidField]
+          "#{response[:message]}: #{response[:invalidField]}"
+        else
+          response[:message]
+        end
       end
     end
   end

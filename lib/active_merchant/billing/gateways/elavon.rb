@@ -26,6 +26,7 @@ module ActiveMerchant #:nodoc:
         void: 'CCDELETE',
         store: 'CCGETTOKEN',
         update: 'CCUPDATETOKEN',
+        verify: 'CCVERIFY'
       }
 
       def initialize(options = {})
@@ -48,6 +49,7 @@ module ActiveMerchant #:nodoc:
         add_test_mode(form, options)
         add_ip(form, options)
         add_ssl_dynamic_dba(form, options)
+        add_level_3_fields(form, options) if options[:level_3_data]
         commit(:purchase, money, form, options)
       end
 
@@ -62,6 +64,7 @@ module ActiveMerchant #:nodoc:
         add_test_mode(form, options)
         add_ip(form, options)
         add_ssl_dynamic_dba(form, options)
+        add_level_3_fields(form, options) if options[:level_3_data]
         commit(:authorize, money, form, options)
       end
 
@@ -74,6 +77,7 @@ module ActiveMerchant #:nodoc:
           add_invoice(form, options)
           add_creditcard(form, options[:credit_card])
           add_currency(form, money, options)
+          add_address(form, options)
           add_customer_data(form, options)
           add_test_mode(form, options)
         else
@@ -113,10 +117,12 @@ module ActiveMerchant #:nodoc:
       end
 
       def verify(credit_card, options = {})
-        MultiResponse.run(:use_first_response) do |r|
-          r.process { authorize(100, credit_card, options) }
-          r.process(:ignore_result) { void(r.authorization, options) }
-        end
+        form = {}
+        add_creditcard(form, credit_card)
+        add_address(form, options)
+        add_test_mode(form, options)
+        add_ip(form, options)
+        commit(:verify, 0, form, options)
       end
 
       def store(creditcard, options = {})
@@ -255,6 +261,46 @@ module ActiveMerchant #:nodoc:
         form[:dynamic_dba] = options[:dba] if options.has_key?(:dba)
       end
 
+      def add_level_3_fields(form, options)
+        level_3_data = options[:level_3_data]
+        form[:customer_code] = level_3_data[:customer_code] if level_3_data[:customer_code]
+        form[:salestax] = level_3_data[:salestax] if level_3_data[:salestax]
+        form[:salestax_indicator] = level_3_data[:salestax_indicator] if level_3_data[:salestax_indicator]
+        form[:level3_indicator] = level_3_data[:level3_indicator] if level_3_data[:level3_indicator]
+        form[:ship_to_zip] = level_3_data[:ship_to_zip] if level_3_data[:ship_to_zip]
+        form[:ship_to_country] = level_3_data[:ship_to_country] if level_3_data[:ship_to_country]
+        form[:shipping_amount] = level_3_data[:shipping_amount] if level_3_data[:shipping_amount]
+        form[:ship_from_postal_code] = level_3_data[:ship_from_postal_code] if level_3_data[:ship_from_postal_code]
+        form[:discount_amount] = level_3_data[:discount_amount] if level_3_data[:discount_amount]
+        form[:duty_amount] = level_3_data[:duty_amount] if level_3_data[:duty_amount]
+        form[:national_tax_indicator] = level_3_data[:national_tax_indicator] if level_3_data[:national_tax_indicator]
+        form[:national_tax_amount] = level_3_data[:national_tax_amount] if level_3_data[:national_tax_amount]
+        form[:order_date] = level_3_data[:order_date] if level_3_data[:order_date]
+        form[:other_tax] = level_3_data[:other_tax] if level_3_data[:other_tax]
+        form[:summary_commodity_code] = level_3_data[:summary_commodity_code] if level_3_data[:summary_commodity_code]
+        form[:merchant_vat_number] = level_3_data[:merchant_vat_number] if level_3_data[:merchant_vat_number]
+        form[:customer_vat_number] = level_3_data[:customer_vat_number] if level_3_data[:customer_vat_number]
+        form[:freight_tax_amount] = level_3_data[:freight_tax_amount] if level_3_data[:freight_tax_amount]
+        form[:vat_invoice_number] = level_3_data[:vat_invoice_number] if level_3_data[:vat_invoice_number]
+        form[:tracking_number] = level_3_data[:tracking_number] if level_3_data[:tracking_number]
+        form[:shipping_company] = level_3_data[:shipping_company] if level_3_data[:shipping_company]
+        form[:other_fees] = level_3_data[:other_fees] if level_3_data[:other_fees]
+        add_line_items(form, level_3_data) if level_3_data[:line_items]
+      end
+
+      def add_line_items(form, level_3_data)
+        items = []
+        level_3_data[:line_items].each do |line_item|
+          item = {}
+          line_item.each do |key, value|
+            prefixed_key = "ssl_line_Item_#{key}"
+            item[prefixed_key.to_sym] = value
+          end
+          items << item
+        end
+        form[:LineItemProducts] = { product: items }
+      end
+
       def message_from(response)
         success?(response) ? response['result_message'] : response['errorMessage']
       end
@@ -284,7 +330,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def post_data_string(key, value, options)
-        if custom_field?(key, options)
+        if custom_field?(key, options) || key == :LineItemProducts
           "#{key}=#{CGI.escape(value.to_s)}"
         else
           "ssl_#{key}=#{CGI.escape(value.to_s)}"

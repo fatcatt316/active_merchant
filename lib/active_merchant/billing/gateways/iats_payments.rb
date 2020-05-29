@@ -16,6 +16,7 @@ module ActiveMerchant #:nodoc:
       ACTIONS = {
         purchase: 'ProcessCreditCard',
         purchase_check: 'ProcessACHEFT',
+        purchase_customer_code: 'ProcessCreditCardWithCustomerCode',
         refund: 'ProcessCreditCardRefundWithTransactionId',
         refund_check: 'ProcessACHEFTRefundWithTransactionId',
         store: 'CreateCreditCardCustomerCode',
@@ -39,11 +40,10 @@ module ActiveMerchant #:nodoc:
         add_invoice(post, money, options)
         add_payment(post, payment)
         add_address(post, options)
-        add_customer_details(post, options)
         add_ip(post, options)
         add_description(post, options)
 
-        commit((payment.is_a?(Check) ? :purchase_check : :purchase), post)
+        commit(determine_purchase_type(payment), post)
       end
 
       def refund(money, authorization, options={})
@@ -61,7 +61,6 @@ module ActiveMerchant #:nodoc:
         post = {}
         add_payment(post, credit_card)
         add_address(post, options)
-        add_customer_details(post, options)
         add_ip(post, options)
         add_description(post, options)
         add_store_defaults(post)
@@ -92,6 +91,16 @@ module ActiveMerchant #:nodoc:
 
       private
 
+      def determine_purchase_type(payment)
+        if payment.is_a?(String)
+          :purchase_customer_code
+        elsif payment.is_a?(Check)
+          :purchase_check
+        else
+          :purchase
+        end
+      end
+
       def add_ip(post, options)
         post[:customer_ip_address] = options[:ip] if options.has_key?(:ip)
       end
@@ -103,6 +112,9 @@ module ActiveMerchant #:nodoc:
           post[:city] = billing_address[:city]
           post[:state] = billing_address[:state]
           post[:zip_code] = billing_address[:zip]
+          post[:phone] = billing_address[:phone] if billing_address[:phone]
+          post[:email] = billing_address[:email] if billing_address[:email]
+          post[:country] = billing_address[:country] if billing_address[:country]
         end
       end
 
@@ -116,7 +128,9 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_payment(post, payment)
-        if payment.is_a?(Check)
+        if payment.is_a?(String)
+          post[:customer_code] = payment
+        elsif payment.is_a?(Check)
           add_check(post, payment)
         else
           add_credit_card(post, payment)
@@ -144,12 +158,6 @@ module ActiveMerchant #:nodoc:
         post[:begin_date] = Time.now.xmlschema
         post[:end_date] = Time.now.xmlschema
         post[:amount] = 0
-      end
-
-      def add_customer_details(post, options)
-        post[:phone] = options[:phone] if options[:phone]
-        post[:email] = options[:email] if options[:email]
-        post[:country] = options[:country] if options[:country]
       end
 
       def expdate(creditcard)
@@ -188,6 +196,7 @@ module ActiveMerchant #:nodoc:
         {
           purchase: 'ProcessLinkv3.asmx',
           purchase_check: 'ProcessLinkv3.asmx',
+          purchase_customer_code: 'ProcessLinkv3.asmx',
           refund: 'ProcessLinkv3.asmx',
           refund_check: 'ProcessLinkv3.asmx',
           store: 'CustomerLinkv3.asmx',

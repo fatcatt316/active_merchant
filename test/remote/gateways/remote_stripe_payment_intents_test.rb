@@ -180,7 +180,8 @@ class RemoteStripeIntentsTest < Test::Unit::TestCase
       currency: 'USD',
       customer: @customer,
       confirm: true,
-      return_url: 'https://www.example.com'
+      return_url: 'https://www.example.com',
+      execute_threed: true
     }
 
     assert response = @gateway.create_intent(@amount, @three_ds_credit_card, options)
@@ -254,6 +255,19 @@ class RemoteStripeIntentsTest < Test::Unit::TestCase
 
     assert response = @gateway.authorize(@amount, @three_ds_credit_card, options)
     assert_failure response
+  end
+
+  def test_purchase_fails_on_unexpected_3ds_initiation
+    options = {
+      currency: 'USD',
+      customer: @customer,
+      confirm: true,
+      return_url: 'https://www.example.com'
+    }
+
+    assert response = @gateway.purchase(100, @three_ds_credit_card, options)
+    assert_failure response
+    assert_match 'Received unexpected 3DS authentication response', response.message
   end
 
   def test_create_payment_intent_with_shipping_address
@@ -511,6 +525,39 @@ class RemoteStripeIntentsTest < Test::Unit::TestCase
     assert_equal true, refund.params['charge']['captured']
     refund_id = refund.params['id']
     assert_equal refund.authorization, refund_id
+  end
+
+  def test_refund_when_payment_intent_not_captured
+    options = {
+      currency: 'GBP',
+      customer: @customer,
+      confirmation_method: 'manual',
+      capture_method: 'manual',
+      confirm: true
+    }
+    assert create_response = @gateway.create_intent(@amount, @visa_payment_method, options)
+    intent_id = create_response.params['id']
+
+    refund = @gateway.refund(@amount - 20, intent_id)
+    assert_failure refund
+    assert refund.params['error']
+  end
+
+  def test_refund_when_payment_intent_requires_action
+    options = {
+      currency: 'GBP',
+      customer: @customer,
+      confirmation_method: 'manual',
+      capture_method: 'manual',
+      confirm: true
+    }
+    assert create_response = @gateway.create_intent(@amount, @three_ds_authentication_required, options)
+    assert_equal 'requires_action', create_response.params['status']
+    intent_id = create_response.params['id']
+
+    refund = @gateway.refund(@amount - 20, intent_id)
+    assert_failure refund
+    assert_match /has a status of requires_action/, refund.message
   end
 
   def test_successful_store_purchase_and_unstore

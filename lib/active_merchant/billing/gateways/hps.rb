@@ -21,6 +21,8 @@ module ActiveMerchant #:nodoc:
         visa:             'Visa 3DSecure',
         american_express: 'AMEX 3DSecure',
         discover:         'Discover 3DSecure',
+        android_pay:      'GooglePayApp',
+        google_pay:       'GooglePayApp'
       }
 
       def initialize(options={})
@@ -199,9 +201,9 @@ module ActiveMerchant #:nodoc:
           xml.hps :RoutingNumber, check.routing_number
           xml.hps :AccountNumber, check.account_number
           xml.hps :CheckNumber, check.number
-          xml.hps :AccountType, check.account_type.upcase
+          xml.hps :AccountType, check.account_type&.upcase
         end
-        xml.hps :CheckType, check.account_holder_type.upcase
+        xml.hps :CheckType, check.account_holder_type&.upcase
       end
 
       def add_details(xml, options)

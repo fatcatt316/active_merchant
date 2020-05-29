@@ -664,18 +664,19 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_successful_response(response)
   end
 
-  def test_successful_first_unscheduled_cof_transaction
+  def test_successful_first_cof_authorize
     @options[:stored_credential] = {
       initiator: 'cardholder',
-      reason_type: 'unscheduled',
+      reason_type: '',
       initial_transaction: true,
       network_transaction_id: ''
     }
+    @options[:commerce_indicator] = 'internet'
     assert response = @gateway.authorize(@amount, @credit_card, @options)
     assert_successful_response(response)
   end
 
-  def test_successful_subsequent_unscheduled_cof_transaction
+  def test_successful_subsequent_unscheduled_cof_authorize
     @options[:stored_credential] = {
       initiator: 'merchant',
       reason_type: 'unscheduled',
@@ -686,18 +687,18 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     assert_successful_response(response)
   end
 
-  def test_successful_first_recurring_cof_transaction
+  def test_successful_recurring_cof_authorize
     @options[:stored_credential] = {
-      initiator: 'cardholder',
+      initiator: 'merchant',
       reason_type: 'recurring',
-      initial_transaction: true,
+      initial_transaction: false,
       network_transaction_id: ''
     }
     assert response = @gateway.authorize(@amount, @credit_card, @options)
     assert_successful_response(response)
   end
 
-  def test_successful_subsequent_recurring_cof_transaction
+  def test_successful_subsequent_recurring_cof_authorize
     @options[:stored_credential] = {
       initiator: 'merchant',
       reason_type: 'recurring',
@@ -706,6 +707,60 @@ class RemoteCyberSourceTest < Test::Unit::TestCase
     }
     assert response = @gateway.authorize(@amount, @credit_card, @options)
     assert_successful_response(response)
+  end
+
+  def test_successful_subsequent_installment_cof_authorize
+    @options[:stored_credential] = {
+      initiator: 'merchant',
+      reason_type: 'installment',
+      initial_transaction: false,
+      network_transaction_id: '016150703802094'
+    }
+    assert response = @gateway.authorize(@amount, @credit_card, @options)
+    assert_successful_response(response)
+  end
+
+  def test_successful_subsequent_unscheduled_cof_purchase
+    @options[:stored_credential] = {
+      initiator: 'merchant',
+      reason_type: 'unscheduled',
+      initial_transaction: false,
+      network_transaction_id: '016150703802094'
+    }
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_successful_response(response)
+  end
+
+  def test_missing_field
+    @options = @options.merge({
+      address: {
+        address1: 'Unspecified',
+        city: 'Unspecified',
+        state: 'NC',
+        zip: '00000',
+        country: ''
+      }
+    })
+
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_failure response
+    assert_equal 'Request is missing one or more required fields: c:billTo/c:country', response.message
+  end
+
+  def test_invalid_field
+    @options = @options.merge({
+      address: {
+        address1: 'Unspecified',
+        city: 'Unspecified',
+        state: 'NC',
+        zip: '1234567890',
+        country: 'US'
+      }
+    })
+
+    assert response = @gateway.purchase(@amount, @credit_card, @options)
+    assert_failure response
+    assert_equal 'One or more fields contains invalid data: c:billTo/c:postalCode', response.message
   end
 
   def pares

@@ -48,6 +48,30 @@ class HpsTest < Test::Unit::TestCase
     assert_success response
   end
 
+  def test_check_purchase_does_not_raise_no_method_error_when_account_type_missing
+    check = @check.dup
+    check.account_type = nil
+    response = stub_comms(@gateway, :ssl_request) do
+      @gateway.purchase(@check_amount, check, @options)
+    end.check_request do |method, endpoint, data, headers|
+      assert_match(/<hps:CheckSale><hps:Block1><hps:CheckAction>SALE<\/hps:CheckAction>/, data)
+    end.respond_with(successful_check_purchase_response)
+
+    assert_success response
+  end
+
+  def test_check_purchase_does_not_raise_no_method_error_when_account_holder_type_missing
+    check = @check.dup
+    check.account_holder_type = nil
+    response = stub_comms(@gateway, :ssl_request) do
+      @gateway.purchase(@check_amount, check, @options)
+    end.check_request do |method, endpoint, data, headers|
+      assert_match(/<hps:CheckSale><hps:Block1><hps:CheckAction>SALE<\/hps:CheckAction>/, data)
+    end.respond_with(successful_check_purchase_response)
+
+    assert_success response
+  end
+
   def test_failed_purchase
     @gateway.expects(:ssl_post).returns(failed_charge_response)
 
@@ -321,6 +345,222 @@ class HpsTest < Test::Unit::TestCase
       payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
       verification_value: nil,
       source: :apple_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_purchase_with_android_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(successful_charge_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :android_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_purchase_with_android_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(failed_charge_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :android_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_purchase_with_android_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(successful_charge_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :android_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_purchase_with_android_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(failed_charge_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :android_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_auth_with_android_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(successful_authorize_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :android_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_auth_with_android_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(failed_authorize_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :android_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_auth_with_android_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(successful_authorize_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :android_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_auth_with_android_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(failed_authorize_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :android_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_purchase_with_google_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(successful_charge_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :google_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_purchase_with_google_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(failed_charge_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :google_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_purchase_with_google_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(successful_charge_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :google_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_purchase_with_google_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(failed_charge_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :google_pay
+    )
+    assert response = @gateway.purchase(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_auth_with_google_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(successful_authorize_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :google_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_auth_with_google_pay_raw_cryptogram_with_eci
+    @gateway.expects(:ssl_post).returns(failed_authorize_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      eci: '05',
+      source: :google_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_failure response
+    assert_equal 'The card was declined.', response.message
+  end
+
+  def test_successful_auth_with_google_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(successful_authorize_response)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :google_pay
+    )
+    assert response = @gateway.authorize(@amount, credit_card, @options)
+    assert_success response
+    assert_equal 'Success', response.message
+  end
+
+  def test_failed_auth_with_google_pay_raw_cryptogram_without_eci
+    @gateway.expects(:ssl_post).returns(failed_authorize_response_decline)
+
+    credit_card = network_tokenization_credit_card('4242424242424242',
+      payment_cryptogram: 'EHuWW9PiBkWvqE5juRwDzAUFBAk=',
+      verification_value: nil,
+      source: :google_pay
     )
     assert response = @gateway.authorize(@amount, credit_card, @options)
     assert_failure response

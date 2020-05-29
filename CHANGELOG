@@ -1,6 +1,32 @@
 = ActiveMerchant CHANGELOG
 
 == HEAD
+* Elavon: Implement true verify action [leila-alderman] #3610
+* Vantiv Express: Implement true verify [leila-alderman] #3617
+* Litle: Pass expiration data for basis payment method [therufs] #3606
+* Stripe Payment Intents: Error handling and backwards compatibility within refund [britth] #3627
+* HPS: Prevent errors when account_type or account_holder_type are nil [britth] #3628
+* D Local: Handle invalid country code errors [curiousepic] #3626
+* Stripe Payment Intents: Utilize execute_threed flag to determine success [britth] #3625
+* Elavon: Add Level 3 fields [leila-alderman] #3632
+* CyberSource: Stored Credential fixes [curiousepic] #3624
+* CyberSource: Fix invalid and missing field tests [curiousepic] #3634
+* CyberSource: Pass stored credentials with purchase [curiousepic] #3636
+* Mercado Pago: Add payment_method_option_id field [schwarzgeist] #3635
+* Stripe: Provide error when attempting an authorize with ACH [britth] #3633
+* EBANX: Send original order id as merchant_payment_code metadata [miguelxpn] #3637
+* Element: Add card_present_code field [schwarzgeist] #3623
+* Orbital: Add support for Level 3 fields [leila-alderman] #3639
+* Firstdata: Strip newline characters from address [bittercoder] #3643
+* Forte: add sec_code attribute for echeck [wsmoak] #3640
+
+== Version 1.107.3 (May 8, 2020)
+* Realex: Ignore IPv6 unsupported addresses [elfassy] #3622
+* Cybersource: Set partnerSolutionID after the business rules, fixes 500 error [pi3r] #3621
+
+== Version 1.107.2 (May 7, 2020)
+* Cybersource: Send a specific card brand commerceIndicator for 3DS [pi3r] #3620
+* Cybersource: Send application_id as partnerSolutionID [pi3r] #3620
 * Iridium: Localize zero-decimal currencies [chinhle23] #3587
 * iVeri: Fix `verify` action [chinhle23] #3588
 * Ixopay: Properly support three-decimal currencies [chinhle23] #3589
@@ -14,6 +40,14 @@
 * iATS Payments: Update gateway to v3 and add support for additional GSFs [naashton] #3599
 * Remove deprecated `rubyforge_project` attribute and tidy up unit test output [fatcatt316] #3598
 * Elavon: Cleanup inadvertant field removal (avs_address) in #3600 [apfranzen] #3602
+* EBANX: Fix transaction amount for verify transaction [miguelxpn] #3603
+* iATS Payments: Update gateway to accept `email`, `phone`, and `country` fields [naashton] #3607
+* Braintree: Fix response for failed refunds when falling back to voids [jasonwebster] #3608
+* Worldpay: Fix response for failed refunds when falling back to voids [jasonwebster] #3609
+* iATS Payments: Add support for Customer Code payment method [molbrown] #3611
+* HPS: Add Google Pay support [MSmedal] #3597
+* Adyen: Parse appropriate message for 3DS2 authorization calls [britth] #3619
+* CyberSource: Add error details response fields [schwarzgeist] #3629
 
 == Version 1.107.1 (Apr 1, 2020)
 * Add `allowed_push_host` to gemspec [mdeloupy]
